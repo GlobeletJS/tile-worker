@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "chunked-queue": "^0.1.4",
-    "tile-mixer": "file:../tile-mixer",
+    "tile-mixer": "^0.2.0",
     "tile-retriever": "^0.0.4"
   }
 }

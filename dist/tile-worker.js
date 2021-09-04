@@ -5367,13 +5367,13 @@ function setParams(userParams) {
   const { glyphs, layers } = userParams;
 
   // Confirm supplied styles are all vector layers reading from the same source
-  if (!layers || !layers.length) fail("no valid array of style layers!");
+  if (!layers || !layers.length) fail("no valid array of style layers");
 
   const allVectors = layers.every(l => vectorTypes.includes(l.type));
-  if (!allVectors) fail("not all layers are vector types!");
+  if (!allVectors) fail("not all layers are vector types");
 
   const sameSource = layers.every(l => l.source === layers[0].source);
-  if (!sameSource) fail("supplied layers use different sources!");
+  if (!sameSource) fail("supplied layers use different sources");
 
   // TODO: check typeof glyphs. Should be a string, but what if undefined?
 

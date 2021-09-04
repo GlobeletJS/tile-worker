@@ -1,0 +1,39 @@
+{
+  "name": "tile-worker",
+  "version": "0.0.0",
+  "description": "Load and parse map tiles on Web Worker threads",
+  "main": "dist/tile-worker.js",
+  "scripts": {
+    "lint": "eslint src",
+    "build": "rollup -c build/rollup.config.js",
+    "test": "npm run lint",
+    "postversion": "git push && git push --tags"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GlobeletJS/tile-worker.git"
+  },
+  "keywords": [
+    "vector",
+    "map",
+    "tile",
+    "worker"
+  ],
+  "author": "Jeshurun Hembd",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/GlobeletJS/tile-worker/issues"
+  },
+  "homepage": "https://github.com/GlobeletJS/tile-worker#readme",
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^13.0.4",
+    "eslint": "^7.32.0",
+    "eslint-config-globeletjs": "^0.0.6",
+    "rollup": "^2.56.3"
+  },
+  "dependencies": {
+    "chunked-queue": "^0.1.4",
+    "tile-mixer": "file:../tile-mixer",
+    "tile-retriever": "^0.0.4"
+  }
+}

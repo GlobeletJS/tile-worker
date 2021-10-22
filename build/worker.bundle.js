@@ -5163,15 +5163,40 @@ function initTileSerializer(styles) {
   };
 }
 
+function initTileFunctions({ source, glyphs, layers }) {
+  const defaultID = layers[0].id;
+  const load = init$1({ source, defaultID });
+
+  const mixer = init({ layers });
+  const serializer = initSerializer({ glyphs, layers });
+
+  function process(id, result, tileCoords) {
+    const data = mixer(result, tileCoords.z);
+    return serializer(data, tileCoords)
+      .then(tile => getTransferables(id, tile));
+  }
+
+  function getTransferables(id, tile) {
+    const transferables = Object.values(tile.layers)
+      .flatMap(l => Object.values(l.buffers).map(b => b.buffer));
+    transferables.push(tile.atlas.data.buffer);
+
+    return { id, tile, transferables };
+  }
+
+  return { load, process };
+}
+
 const tasks = {};
-let loader, mixer, serializer;
+let tileFuncs;
 
 onmessage = function(msgEvent) {
   const { id, type, payload } = msgEvent.data;
 
   switch (type) {
     case "setup":
-      return setup(payload);
+      tileFuncs = initTileFunctions(payload);
+      return;
     case "getTile":
       return getTile(payload, id);
     case "cancel":
@@ -5179,18 +5204,9 @@ onmessage = function(msgEvent) {
   }
 };
 
-function setup(payload) {
-  const { source, glyphs, layers } = payload;
-  // NOTE: changing global variables!
-  const defaultID = layers[0].id;
-  loader = init$1({ source, defaultID });
-  mixer = init({ layers });
-  serializer = initSerializer({ glyphs, layers });
-}
-
 function getTile(payload, id) {
   const callback = (err, result) => process(id, err, result, payload);
-  const request = loader(payload, callback);
+  const request = tileFuncs.load(payload, callback);
   tasks[id] = { request, status: "requested" };
 }
 
@@ -5201,7 +5217,6 @@ function cancel(id) {
 }
 
 function process(id, err, result, tileCoords) {
-  // Make sure we still have an active task for this ID
   const task = tasks[id];
   if (!task) return;  // Task must have been canceled
 
@@ -5211,19 +5226,13 @@ function process(id, err, result, tileCoords) {
   }
 
   task.status = "parsing";
-  const data = mixer(result, tileCoords.z);
-  return serializer(data, tileCoords).then(tile => sendTile(id, tile));
+  return tileFuncs.process(id, result, tileCoords).then(sendTile);
 }
 
-function sendTile(id, tile) {
-  // Make sure we still have an active task for this ID
+function sendTile({ id, tile, transferables }) {
   const task = tasks[id];
   if (!task) return; // Task must have been canceled
 
-  // Get a list of all the Transferable objects
-  const transferables = Object.values(tile.layers)
-    .flatMap(l => Object.values(l.buffers).map(b => b.buffer));
-  transferables.push(tile.atlas.data.buffer);
-
   postMessage({ id, type: "data", payload: tile }, transferables);
+  delete tasks[id];
 }

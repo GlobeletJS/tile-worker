@@ -1,8 +1,9 @@
 import * as tileRetriever from "tile-retriever";
 import * as tileMixer from "tile-mixer";
+import { initSerializer } from "tile-gl";
 
 const tasks = {};
-let loader, processor;
+let loader, mixer, serializer;
 
 onmessage = function(msgEvent) {
   const { id, type, payload } = msgEvent.data;
@@ -23,7 +24,8 @@ function setup(payload) {
   // NOTE: changing global variables!
   const defaultID = layers[0].id;
   loader = tileRetriever.init({ source, defaultID });
-  processor = tileMixer.init({ glyphs, layers });
+  mixer = tileMixer.init({ layers });
+  serializer = initSerializer({ glyphs, layers });
 }
 
 function getTile(payload, id) {
@@ -49,7 +51,8 @@ function process(id, err, result, tileCoords) {
   }
 
   task.status = "parsing";
-  return processor(result, tileCoords).then(tile => sendTile(id, tile));
+  const data = mixer(result, tileCoords.z);
+  return serializer(data, tileCoords).then(tile => sendTile(id, tile));
 }
 
 function sendTile(id, tile) {

@@ -40,23 +40,30 @@ const loader = tileWorker.init(parameters);
 ```
 
 The supplied parameters object has the following properties
-- `threads`: Number of [Web Workers][] that will be used to load and parse
-  tiles from the API. Default: 2
+- `threads`: Number of [Web Workers][Web Worker] that will be used to load 
+  and parse tiles from the API. Default: 2
 - `context`: A WebGL context wrapper, as created by the [tile-gl][] method
   `initGLpaint`. The returned buffer data will be loaded to the WebGL context
   by this wrapper
+- `queue`: an instance of [chunked-queue][] to use for managing long-running
+  tasks. If not supplied, tile-mixer will initialize its own queue
 - `source`: The desired [source][] value from the 'sources' property of the
   style document. Note that any 'url' property will be ignored. The relevant
   [TileJSON][] properties MUST be supplied directly. REQUIRED
 - `glyphs`: The [glyphs][] property from the style document. Used for processing
   text labels in symbol layers
+- `spriteData`: The data referenced in the [sprite][] property from the
+  style document, loaded into an object with properties `{ image, meta }`,
+  as returned by [tile-stencil][]
 - `layers`: An array containing the [layers][] from the style document that
   use data from the specified source. REQUIRED
-- `queue`: an instance of [chunked-queue][] to use for managing long-running
-  tasks. If not supplied, tile-mixer will initialize its own queue
 
 [tile-gl]: https://github.com/GlobeletJS/tile-gl
+[source]: https://maplibre.org/maplibre-gl-js-docs/style-spec/sources/
+[TileJSON]: https://github.com/mapbox/tilejson-spec
 [glyphs]: https://maplibre.org/maplibre-gl-js-docs/style-spec/glyphs/
+[sprite]: https://maplibre.org/maplibre-gl-js-docs/style-spec/sprite/
+[tile-stencil]: https://github.com/GlobeletJS/tile-stencil/
 
 ## API
 Initialization returns an object that you can use to request and process

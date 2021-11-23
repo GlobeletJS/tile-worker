@@ -2,12 +2,12 @@ import * as tileRetriever from "tile-retriever";
 import * as tileMixer from "tile-mixer";
 import { initSerializer } from "tile-gl";
 
-export function initTileFunctions({ source, glyphs, layers }) {
+export function initTileFunctions({ source, glyphs, spriteData, layers }) {
   const defaultID = layers[0].id;
   const load = tileRetriever.init({ source, defaultID });
 
   const mixer = tileMixer.init({ layers });
-  const serializer = initSerializer({ glyphs, layers });
+  const serializer = initSerializer({ glyphs, spriteData, layers });
 
   function process(id, result, tileCoords) {
     const data = mixer(result, tileCoords.z);

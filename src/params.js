@@ -2,28 +2,34 @@ import * as chunkedQueue from "chunked-queue";
 
 export function setParams(userParams) {
   const {
-    threads = 2,
-    context,
-    source,
-    glyphs,
-    layers,
+    context, threads = 2,
     queue = chunkedQueue.init(),
+    source, glyphs, layers, spriteData,
   } = userParams;
 
-  if (!source) fail("parameters.source is required");
+  if (source?.type !== "vector") fail("no valid vector tile source");
+  if (!source.tiles?.length) fail("no valid vector tile endpoint");
 
-  if (source.type === "vector" && !(source.tiles && source.tiles.length)) {
-    fail("no valid vector tile endpoints");
+  if (!layers?.length) fail ("no valid array of style layers");
+  if (!layers.every(isVector)) fail("not all layers are vector layers");
+
+  const sameSource = layers.every(l => l.source === layers[0].source);
+  if (!sameSource) fail("supplied layers use different sources");
+
+  const params = { context, threads, queue, source, glyphs, layers };
+
+  if (spriteData) {
+    const { image, meta } = spriteData;
+    if (!(image instanceof HTMLImageElement)) fail("invalid spriteData");
+    const { width, height } = image;
+    params.spriteData = { image: { width, height }, meta };
   }
 
-  return {
-    threads,
-    context,
-    source,
-    glyphs,
-    layers,
-    queue,
-  };
+  return params;
+}
+
+function isVector(layer) {
+  return ["symbol", "circle", "line", "fill"].includes(layer.type);
 }
 
 function fail(message) {

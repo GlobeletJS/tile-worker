@@ -1,5 +1,5 @@
 export function initWorkers(codeHref, params) {
-  const { threads, glyphs, layers, source } = params;
+  const { threads, source, glyphs, spriteData, layers } = params;
 
   const tasks = {};
   let msgId = 0;
@@ -7,7 +7,7 @@ export function initWorkers(codeHref, params) {
   // Initialize the worker threads, and send them the styles
   function trainWorker() {
     const worker = new Worker(codeHref);
-    const payload = { source, glyphs, layers };
+    const payload = { source, glyphs, spriteData, layers };
     worker.postMessage({ id: 0, type: "setup", payload });
     worker.onmessage = handleMsg;
     return worker;

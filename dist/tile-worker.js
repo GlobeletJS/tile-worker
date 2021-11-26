@@ -102,8 +102,11 @@ function setParams(userParams) {
     source, glyphs, layers, spriteData,
   } = userParams;
 
-  if (source?.type !== "vector") fail("no valid vector tile source");
-  if (!source.tiles?.length) fail("no valid vector tile endpoint");
+  if (source?.type === "vector") {
+    if (!source.tiles.length) fail("no valid vector tile endpoint");
+  } else if (source?.type !== "geojson") {
+    fail("no valid vector or geojson source");
+  }
 
   if (!layers?.length) fail ("no valid array of style layers");
   if (!layers.every(isVector)) fail("not all layers are vector layers");

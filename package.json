@@ -1,6 +1,6 @@
 {
   "name": "tile-worker",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Load and parse map tiles on Web Worker threads",
   "main": "dist/tile-worker.js",
   "scripts": {

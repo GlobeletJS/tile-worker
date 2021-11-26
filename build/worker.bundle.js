@@ -3387,14 +3387,25 @@ function initIcon(style, spriteData = {}) {
   const getStyles = initStyleGetters(iconKeys, style);
 
   return function(feature, tileCoords) {
-    const sprite = getSprite(feature, width, height, meta);
+    const sprite = getSprite(feature.spriteID);
     if (!sprite) return;
 
-    // const { layoutVals, bufferVals } = getStyles(tileCoords.z, feature);
-    const { layoutVals } = getStyles(tileCoords.z, feature);
+    const { layoutVals, bufferVals } = getStyles(tileCoords.z, feature);
     const icon = layoutSprite(sprite, layoutVals);
-    return icon; // TODO: what about bufferVals?
+    return Object.assign(icon, { bufferVals }); // TODO: rethink this
   };
+
+  function getSprite(spriteID) {
+    const rawRect = meta[spriteID];
+    if (!rawRect) return;
+
+    const { x, y, width: w, height: h, pixelRatio = 1 } = rawRect;
+    const spriteRect = [x / width, y / height, w / width, h / height];
+    const scale = 1.0 / Math.max(1.0, pixelRatio);
+    const metrics = { w: w * scale, h: h * scale };
+
+    return { spriteID, metrics, spriteRect };
+  }
 }
 
 const iconKeys = {
@@ -3405,19 +3416,10 @@ const iconKeys = {
     "icon-rotation-alignment",
     "icon-size",
   ],
-  paint: [],
+  paint: [
+    "icon-opacity",
+  ],
 };
-
-function getSprite({ spriteID }, width, height, meta) {
-  const rawRect = meta[spriteID];
-  if (!rawRect) return;
-
-  const { x, y, width: w, height: h } = rawRect;
-  const spriteRect = [x / width, y / height, w / width, h / height];
-  const metrics = { w, h };
-
-  return { spriteID, metrics, spriteRect };
-}
 
 function layoutSprite(sprite, styleVals) {
   const { metrics: { w, h }, spriteRect } = sprite;
@@ -3693,6 +3695,9 @@ const textKeys = {
   paint: [
     "text-color",
     "text-opacity",
+    "text-halo-blur",
+    "text-halo-color",
+    "text-halo-width",
   ],
 };
 
@@ -3989,6 +3994,10 @@ function getIconBuffers(icon, anchor, { z, x, y }) {
     tileCoords: [x, y, z],
   };
 
+  Object.entries(icon.bufferVals).forEach(([key, val]) => {
+    buffers[key] = val;
+  });
+
   return buffers;
 }
 
@@ -4034,13 +4043,13 @@ function initShaping(style, spriteData) {
 
     return anchors
       .map(anchor => getBuffers(icon, text, anchor, tileCoords))
-      .reduce(combineBuffers);
+      .reduce(combineBuffers, {});
   };
 }
 
 function combineBuffers(dict, buffers) {
-  Object.keys(dict).forEach(k => {
-    const base = dict[k];
+  Object.keys(buffers).forEach(k => {
+    const base = dict[k] || (dict[k] = []);
     buffers[k].forEach(v => base.push(v));
   });
   return dict;
@@ -4067,7 +4076,12 @@ function flattenPoints(geometry) {
 }
 
 const lineInfo = {
-  styleKeys: ["line-color", "line-opacity"], // TODO: line-width, line-gap-width
+  styleKeys: [
+    "line-color",
+    "line-opacity",
+    "line-width",
+    "line-gap-width",
+  ],
   serialize: flattenLines,
   getLength: (buffers) => buffers.lines.length / 3,
 };

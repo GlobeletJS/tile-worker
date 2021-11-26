@@ -27,13 +27,13 @@
   "homepage": "https://github.com/GlobeletJS/tile-worker#readme",
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^13.0.6",
-    "eslint": "^8.0.1",
+    "eslint": "^8.3.0",
     "eslint-config-globeletjs": "^0.0.6",
-    "rollup": "^2.58.0"
+    "rollup": "^2.60.1"
   },
   "dependencies": {
     "chunked-queue": "^0.1.4",
-    "tile-gl": "^0.4.1",
+    "tile-gl": "^0.4.3",
     "tile-mixer": "^0.3.1",
     "tile-retriever": "^0.0.4"
   }

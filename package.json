@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "chunked-queue": "^0.1.4",
-    "tile-gl": "^0.4.4",
+    "tile-gl": "^0.4.6",
     "tile-mixer": "^0.3.1",
     "tile-retriever": "^0.0.4"
   }

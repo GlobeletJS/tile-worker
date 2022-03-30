@@ -3716,8 +3716,9 @@ const textKeys = {
 };
 
 function getGlyphs(feature, atlas) {
+  if (!atlas) return;
   const { charCodes, font } = feature;
-  const positions = atlas?.positions[font];
+  const positions = atlas.positions[font];
   if (!positions || !charCodes || !charCodes.length) return;
 
   const { width, height } = atlas.image;
@@ -3991,7 +3992,9 @@ function getLineAnchors(geometry, extent, icon, text, layoutVals) {
   const alignment = (text) ? textRotationAlignment : iconRotationAlignment;
   const keepUpright = (text) ? textKeepUpright : iconKeepUpright;
 
-  const box = mergeBoxes(icon?.bbox, text?.bbox);
+  const iconbox = (icon) ? icon.bbox : undefined;
+  const textbox = (text) ? text.bbox : undefined;
+  const box = mergeBoxes(iconbox, textbox);
   const labelLength = (alignment === "viewport") ? 0.0 : box[2] - box[0];
   const spacing = max(symbolSpacing, labelLength + symbolSpacing / 4);
 
@@ -4075,22 +4078,19 @@ function getPointAnchors({ type, coordinates }) {
   }
 }
 
-function getBuffers(icon, text, anchor, tileCoords) {
-  const iconBuffers = getIconBuffers(icon, anchor, tileCoords);
-  const textBuffers = getTextBuffers(text, anchor, tileCoords);
+function getBuffers(icon, text, anchor) {
+  const iconBuffers = getIconBuffers(icon, anchor);
+  const textBuffers = getTextBuffers(text, anchor);
   return mergeBuffers(iconBuffers, textBuffers);
 }
 
-function getIconBuffers(icon, anchor, { z, x, y }) {
+function getIconBuffers(icon, anchor) {
   if (!icon) return;
 
-  // NOTE: mergeBuffers may overwrite tileCoords with the text buffer of the
-  // same name. This is OK because the text buffer, if it exists, is longer
   const buffers = {
     spriteRect: icon.rect,
     spritePos: icon.pos,
     labelPos0: [...anchor],
-    tileCoords: [x, y, z],
   };
 
   Object.entries(icon.bufferVals).forEach(([key, val]) => {
@@ -4100,7 +4100,7 @@ function getIconBuffers(icon, anchor, { z, x, y }) {
   return buffers;
 }
 
-function getTextBuffers(text, anchor, { z, x, y }) {
+function getTextBuffers(text, anchor) {
   if (!text) return;
 
   const origin = [...anchor, text.fontScalar];
@@ -4109,7 +4109,6 @@ function getTextBuffers(text, anchor, { z, x, y }) {
     sdfRect: text.flatMap(c => c.rect),
     charPos: text.flatMap(c => c.pos),
     labelPos: text.flatMap(() => origin),
-    tileCoords: text.flatMap(() => [x, y, z]),
   };
 
   Object.entries(text.bufferVals).forEach(([key, val]) => {
@@ -4130,7 +4129,9 @@ function initShaping(style, spriteData) {
   const getText = initText(style);
   const getAnchors = initAnchors(style);
 
-  return function(feature, tileCoords, atlas, tree) {
+  return { serialize, getLength };
+
+  function serialize(feature, tileCoords, atlas, tree) {
     // tree is an RBush from the 'rbush' module. NOTE: will be updated!
 
     const icon = getIcon(feature, tileCoords);
@@ -4141,9 +4142,15 @@ function initShaping(style, spriteData) {
     if (!anchors || !anchors.length) return;
 
     return anchors
-      .map(anchor => getBuffers(icon, text, anchor, tileCoords))
+      .map(anchor => getBuffers(icon, text, anchor))
       .reduce(combineBuffers, {});
-  };
+  }
+
+  function getLength(buffers) {
+    const { charPos, spritePos } = buffers;
+    // If charPos exists, it is longer than spritePos
+    return charPos ? charPos.length / 4 : spritePos.length / 4;
+  }
 }
 
 function combineBuffers(dict, buffers) {
@@ -4154,14 +4161,32 @@ function combineBuffers(dict, buffers) {
   return dict;
 }
 
+function setParams(userParams) {
+  const { glyphs, spriteData, layers } = userParams;
+
+  if (!layers || !layers.length) fail("no valid array of style layers");
+  const parsedStyles = layers.map(getStyleFuncs);
+
+  const glyphsOK = ["string", "undefined"].includes(typeof glyphs);
+  if (!glyphsOK) fail("glyphs must be a string URL");
+
+  const getAtlas = initAtlasGetter({ parsedStyles, glyphEndpoint: glyphs });
+
+  return { parsedStyles, spriteData, getAtlas };
+}
+
+function fail(message) {
+  throw Error("tile-gl initSerializer: " + message);
+}
+
 const circleInfo = {
   styleKeys: ["circle-radius", "circle-color", "circle-opacity"],
   serialize: flattenPoints,
   getLength: (buffers) => buffers.circlePos.length / 2,
 };
 
-function flattenPoints(geometry) {
-  const { type, coordinates } = geometry;
+function flattenPoints(feature) {
+  const { type, coordinates } = feature.geometry;
   if (!coordinates || !coordinates.length) return;
 
   switch (type) {
@@ -4185,8 +4210,8 @@ const lineInfo = {
   getLength: (buffers) => buffers.lines.length / 3,
 };
 
-function flattenLines(geometry) {
-  const { type, coordinates } = geometry;
+function flattenLines(feature) {
+  const { type, coordinates } = feature.geometry;
   if (!coordinates || !coordinates.length) return;
 
   switch (type) {
@@ -4931,8 +4956,8 @@ const fillInfo = {
   getLength: (buffers) => buffers.position.length / 2,
 };
 
-function triangulate(geometry) {
-  const { type, coordinates } = geometry;
+function triangulate(feature) {
+  const { type, coordinates } = feature.geometry;
   if (!coordinates || !coordinates.length) return;
 
   switch (type) {
@@ -4960,16 +4985,14 @@ function camelCase(hyphenated) {
   return hyphenated.replace(/-([a-z])/gi, (h, c) => c.toUpperCase());
 }
 
-function initFeatureSerializer(style, spriteData) {
-  const { type, paint } = style;
-
-  switch (type) {
+function getSerializeInfo(style, spriteData) {
+  switch (style.type) {
     case "circle":
-      return initParsing(paint, circleInfo);
+      return circleInfo;
     case "line":
-      return initParsing(paint, lineInfo);
+      return lineInfo;
     case "fill":
-      return initParsing(paint, fillInfo);
+      return fillInfo;
     case "symbol":
       return initShaping(style, spriteData);
     default:
@@ -4977,18 +5000,19 @@ function initFeatureSerializer(style, spriteData) {
   }
 }
 
-function initParsing(paint, info) {
-  const { styleKeys, serialize, getLength } = info;
-  const dataFuncs = styleKeys.filter(k => paint[k].type === "property")
+function initFeatureSerializer(paint, info) {
+  const { styleKeys = [], serialize, getLength } = info;
+
+  const dataFuncs = styleKeys
+    .filter(k => paint[k].type === "property")
     .map(k => ([paint[k], camelCase(k)]));
 
-  return function(feature, { z, x, y }) {
-    const buffers = serialize(feature.geometry);
+  return function(feature, tileCoords, atlas, tree) {
+    const buffers = serialize(feature, tileCoords, atlas, tree);
     if (!buffers) return;
 
     const dummy = Array.from({ length: getLength(buffers) });
 
-    buffers.tileCoords = dummy.flatMap(() => [x, y, z]);
     dataFuncs.forEach(([get, key]) => {
       const val = get(null, feature);
       buffers[key] = dummy.flatMap(() => val);
@@ -4998,17 +5022,18 @@ function initParsing(paint, info) {
   };
 }
 
-function concatBuffers(features) {
+function concatBuffers(buffers) {
   // Concatenate the buffers from all the features
-  const arrays = features.map(f => f.buffers).reduce(appendBuffers, {});
+  const arrays = buffers.reduce(appendBuffers, {});
 
   // Convert to TypedArrays (now that the lengths are finalized)
-  return Object.entries(arrays).reduce((d, [key, buffer]) => {
-    d[key] = (key === "indices")
-      ? new Uint32Array(buffer)
-      : new Float32Array(buffer);
-    return d;
-  }, {});
+  return Object.entries(arrays)
+    .reduce((d, [k, a]) => (d[k] = makeTypedArray(k, a), d), {});
+}
+
+function makeTypedArray(key, array) {
+  const type = (key === "indices") ? Uint32Array : Float32Array;
+  return new type(array);
 }
 
 function appendBuffers(buffers, newBuffers) {
@@ -5031,25 +5056,24 @@ function appendBuffers(buffers, newBuffers) {
 function initLayerSerializer(style, spriteData) {
   const { id, type, interactive } = style;
 
-  const transform = initFeatureSerializer(style, spriteData);
+  const info = getSerializeInfo(style, spriteData);
+  const transform = initFeatureSerializer(style.paint, info);
   if (!transform) return;
 
   return function(layer, tileCoords, atlas, tree) {
     const { extent, features } = layer;
 
-    const transformed = features.map(feature => {
-      const { properties, geometry } = feature;
-      const buffers = transform(feature, tileCoords, atlas, tree);
-      // If no buffers, skip entire feature (it won't be rendered)
-      if (buffers) return { properties, geometry, buffers };
-    }).filter(f => f !== undefined);
+    const transformed = features
+      .map(f => transform(f, tileCoords, atlas, tree))
+      .filter(f => f !== undefined);
 
     if (!transformed.length) return;
 
-    const newLayer = { type, extent, buffers: concatBuffers(transformed) };
+    const buffers = concatBuffers(transformed);
+    const length = info.getLength(buffers);
+    const newLayer = { type, extent, buffers, length };
 
-    if (interactive) newLayer.features = transformed
-      .map(({ properties, geometry }) => ({ properties, geometry }));
+    if (interactive) newLayer.features = features.slice();
 
     return { [id]: newLayer };
   };
@@ -5620,52 +5644,47 @@ function multiSelect(arr, left, right, n, compare) {
     }
 }
 
-function initTileSerializer(styles, spriteData) {
-  const layerSerializers = styles
-    .reduce((d, s) => (d[s.id] = initLayerSerializer(s, spriteData), d), {});
+function addTileCoords(tile, coords) {
+  const { z, x, y } = coords;
 
-  return function(layers, tileCoords, atlas) {
-    const tree = new RBush();
+  Object.values(tile.layers).forEach(layer => {
+    const { length, buffers } = layer;
+    const coordArray = Array.from({ length }).flatMap(() => [x, y, z]);
+    buffers.tileCoords = new Float32Array(coordArray);
+  });
 
-    return Object.entries(layers)
-      .reverse() // Reverse order for collision checks
-      .map(([id, layer]) => {
-        const serialize = layerSerializers[id];
-        if (serialize) return serialize(layer, tileCoords, atlas, tree);
-      })
-      .reverse()
-      .reduce((d, l) => Object.assign(d, l), {});
-  };
+  return tile;
 }
 
 function initSerializer(userParams) {
-  const { glyphEndpoint, spriteData, layers } = setParams(userParams);
-  const parsedStyles = layers.map(getStyleFuncs);
+  const { parsedStyles, spriteData, getAtlas } = setParams(userParams);
 
-  const getAtlas = initAtlasGetter({ parsedStyles, glyphEndpoint });
-  const process = initTileSerializer(parsedStyles, spriteData);
+  const layerSerializers = parsedStyles
+    .reduce((d, s) => (d[s.id] = initLayerSerializer(s, spriteData), d), {});
 
   return function(source, tileCoords) {
-    return getAtlas(source, tileCoords.z).then(atlas => {
-      const layers = process(source, tileCoords, atlas);
-
-      // Note: atlas.data.buffer is a Transferable
-      return { atlas: atlas.image, layers };
-    });
+    return getAtlas(source, tileCoords.z)
+      .then(atlas => process(source, tileCoords, atlas))
+      .then(tile => addTileCoords(tile, tileCoords));
   };
-}
 
-function setParams({ glyphs, spriteData, layers }) {
-  if (!layers || !layers.length) fail("no valid array of style layers");
+  function process(source, coords, atlas) {
+    const tree = new RBush();
 
-  const glyphsOK = ["string", "undefined"].includes(typeof glyphs);
-  if (!glyphsOK) fail("glyphs must be a string URL");
+    function serializeLayer([id, layer]) {
+      const serialize = layerSerializers[id];
+      if (serialize) return serialize(layer, coords, atlas, tree);
+    }
 
-  return { glyphEndpoint: glyphs, spriteData, layers };
-}
+    const layers = Object.entries(source)
+      .reverse() // Reverse order for collision checks
+      .map(serializeLayer)
+      .reverse()
+      .reduce((d, l) => Object.assign(d, l), {});
 
-function fail(message) {
-  throw Error("tile-gl initSerializer: " + message);
+    // Note: atlas.data.buffer is a Transferable
+    return { atlas: atlas.image, layers };
+  }
 }
 
 function initTileFunctions({ source, glyphs, spriteData, layers }) {

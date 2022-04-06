@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "chunked-queue": "^0.1.4",
-    "tile-batch": "github:GlobeletJS/tile-batch",
+    "tile-batch": "^0.0.2",
     "tile-mixer": "^0.3.3",
     "tile-retriever": "^0.0.7"
   }

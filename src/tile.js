@@ -1,6 +1,6 @@
 import * as tileRetriever from "tile-retriever";
 import * as tileMixer from "tile-mixer";
-import { initSerializer } from "tile-gl";
+import { initSerializer } from "tile-batch";
 
 export function initTileFunctions({ source, glyphs, spriteData, layers }) {
   const defaultID = layers[0].id;
